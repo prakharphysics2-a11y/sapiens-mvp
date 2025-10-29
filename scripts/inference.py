@@ -6,14 +6,14 @@ import os
 import sys
 import json
 import time
-import requests
-from tqdm import tqdm
-import logging
+import requests # For downloading the model
+from tqdm import tqdm # For download progress bar
+import logging # Use logging
 
-# Configure logger
+# Configure logger for this module
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-if not logger.handlers:
+if not logger.handlers: # Avoid adding multiple handlers if reloaded
     handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
@@ -22,11 +22,11 @@ if not logger.handlers:
 print("--- Loading Thermal PV Inference Module ---")
 
 # --- Configuration ---
-MODEL_DIR = os.environ.get("MODEL_DIR", "/var/data/model_weights")
+MODEL_DIR = os.environ.get("MODEL_DIR", "/var/data/model_weights") # Standard persistent disk path on Render
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 # !!! ENSURE THIS IS YOUR CORRECT DROPBOX LINK ENDING IN &dl=1 !!!
-MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1"
+MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1" # YOUR LINK
 
 img_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -37,15 +37,19 @@ logger.info("✓ Transforms defined.")
 
 # --- Download Function ---
 def download_model_if_needed(url, dest_path):
+    """Downloads the model from URL to dest_path if it doesn't exist."""
     dest_dir = os.path.dirname(dest_path)
-    try:
-        os.makedirs(dest_dir, exist_ok=True)
-    except OSError as e:
-        logger.error(f"❌ Failed to create directory {dest_dir}: {e}")
-        return False
+    # --- THIS LINE IS COMMENTED OUT ---
+    # os.makedirs(dest_dir, exist_ok=True) # Render provides the mount path, don't create parent
+    # --- END OF CHANGE ---
 
     if not os.path.exists(dest_path):
-        logger.info(f"Model not found at {dest_path}. Downloading...")
+        # Check if the directory itself exists first
+        if not os.path.exists(dest_dir):
+             logger.error(f"❌ ERROR: Destination directory {dest_dir} does not exist. Cannot download model.")
+             return False
+
+        logger.info(f"Model not found at {dest_path}. Downloading from URL...")
         try:
             response = requests.get(url, stream=True, timeout=600)
             response.raise_for_status()
@@ -69,23 +73,11 @@ def download_model_if_needed(url, dest_path):
             return True
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ ERROR: Download failed. Check URL/network. Error: {e}")
-            # --- CORRECTED BLOCK ---
-            if os.path.exists(dest_path):
-                try:
-                    os.remove(dest_path)
-                except OSError:
-                    pass
-            # --- END CORRECTION ---
+            if os.path.exists(dest_path): try: os.remove(dest_path); except OSError: pass
             return False
         except Exception as e:
             logger.error(f"❌ ERROR: Unexpected error during download: {e}")
-            # --- CORRECTED BLOCK ---
-            if os.path.exists(dest_path):
-                try:
-                    os.remove(dest_path)
-                except OSError:
-                    pass
-            # --- END CORRECTION ---
+            if os.path.exists(dest_path): try: os.remove(dest_path); except OSError: pass
             return False
     else:
         logger.info(f"✓ Model already exists at {dest_path}.")
@@ -112,7 +104,7 @@ def load_model():
         loaded_class_names = checkpoint.get('class_names')
         if not loaded_class_names:
             logger.error("❌ ERROR: Class names not in checkpoint!")
-            loaded_class_names = ['crack', 'hotspot', 'no_anomaly', 'pid', 'shading', 'soiling']
+            loaded_class_names = ['crack', 'hotspot', 'no_anomaly', 'pid', 'shading', 'soiling'] # Fallback
             logger.warning(f"Using manual class names: {loaded_class_names}")
         else:
             logger.info(f"✓ Loaded class names: {loaded_class_names}")
@@ -163,13 +155,28 @@ def predict_image(image_path):
 # --- Main Execution Block (for local testing ONLY) ---
 if __name__ == '__main__':
     print("-" * 50); print("Running inference.py directly for local testing"); print("-" * 50)
-    MODEL_DIR = "."
+    MODEL_DIR = "." # Current directory for local test
     MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
     model, class_names = load_model()
     if model is None: sys.exit(1)
     if len(sys.argv) > 1: input_image_path = sys.argv[1]
-    else: input_image_path = 'master_dataset/crack/crack_infrared_9.jpg'
-    if not os.path.exists(input_image_path): print(f"Test image not found: {input_image_path}"); sys.exit(1)
+    else: input_image_path = 'master_dataset/crack/crack_infrared_9.jpg' # Needs valid example name
+    if not os.path.exists(input_image_path):
+        print(f"Test image not found: {input_image_path}")
+        # Try finding *any* image in master_dataset for testing
+        found_test_image = False
+        for root, _, files in os.walk('master_dataset'):
+            for file in files:
+                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp')):
+                    input_image_path = os.path.join(root, file)
+                    print(f"Using fallback test image: {input_image_path}")
+                    found_test_image = True
+                    break
+            if found_test_image: break
+        if not found_test_image:
+             print("Could not find any test images in master_dataset folder.")
+             sys.exit(1)
+
     print(f"Input image: {input_image_path}")
     pred, conf = predict_image(input_image_path)
     if pred and conf is not None: print(f"Prediction: {pred}, Confidence: {conf*100:.2f}%")
