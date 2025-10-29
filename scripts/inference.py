@@ -26,7 +26,8 @@ MODEL_DIR = os.environ.get("MODEL_DIR", "/var/data/model_weights") # Allow overr
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 # !!! ENSURE THIS IS YOUR CORRECT DROPBOX LINK ENDING IN &dl=1 !!!
-MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1" # Placeholder - update if needed
+MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1"
+ # Placeholder - update if needed
 
 img_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
