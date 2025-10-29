@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+ENV/
+instance/
+.webassets-cache
+
+# Uploads (temporary files)
+uploads/
+results/
+/tmp/
+
+# Model files (don't commit - downloaded from Dropbox)
+*.pth
+models/
+/var/data/
+
+# OS
+.DS_Store
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

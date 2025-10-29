@@ -39,6 +39,16 @@ logger.info("✓ Transforms defined.")
 def download_model_if_needed(url, dest_path):
     """Downloads the model from URL to dest_path if it doesn't exist."""
     dest_dir = os.path.dirname(dest_path)
+    # Create directory if it doesn't exist
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+        logger.info(f"✓ Model directory ready: {dest_dir}")
+    except PermissionError:
+        logger.error(f"❌ Permission denied creating {dest_dir}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error creating directory: {e}")
+        return False
     # --- THIS LINE IS COMMENTED OUT ---
     # os.makedirs(dest_dir, exist_ok=True) # Render provides the mount path, don't create parent
     # --- END OF CHANGE ---

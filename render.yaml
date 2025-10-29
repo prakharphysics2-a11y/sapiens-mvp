@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: pv-hawk-api
+    runtime: python
+    pythonVersion: "3.11"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: PYTHONUNBUFFERED
+        value: "true"
+      - key: MODEL_DIR
+        value: "/var/data/pv_hawk_models"
+    build:
+      dir: .
+    healthCheckPath: /health
+    healthCheckStartupDelay: 120
+    
+    disk:
+      name: pv-hawk-model-storage
+      mountPath: /var/data
+      sizeGB: 250
