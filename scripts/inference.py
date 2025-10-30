@@ -7,7 +7,6 @@ import sys
 import logging
 import requests
 from tqdm import tqdm
-from pathlib import Path
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -70,10 +69,10 @@ def download_model_if_needed(url, dest_path):
         
         # Download with progress bar
         with open(dest_path, 'wb') as f, tqdm(
-            desc=MODEL_FILENAME, 
-            total=total_size, 
+            desc=MODEL_FILENAME,
+            total=total_size,
             unit='iB',
-            unit_scale=True, 
+            unit_scale=True,
             unit_divisor=1024,
         ) as progress_bar:
             for data in response.iter_content(block_size):
@@ -129,6 +128,7 @@ def load_model():
         # Get class names
         loaded_class_names = checkpoint.get('class_names')
         if not loaded_class_names:
+            logger.warning("⚠️ WARNING: Class names not in checkpoint. Using fallback.")
             loaded_class_names = ['Crack', 'Hotspot', 'Normal', 'PID', 'Shading', 'Soiling']
             logger.warning(f"Using fallback class names: {loaded_class_names}")
         else:
