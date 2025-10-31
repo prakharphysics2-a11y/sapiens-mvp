@@ -16,7 +16,6 @@ results/
 /tmp/
 
 # Model files (don't commit - downloaded from Dropbox)
-*.pth
 models/
 /var/data/
 
@@ -47,9 +46,7 @@ solar_dataset/
 
 # Models
 model_backups/
-model_weights/
 model_cache/
-*.pth
 
 # Logs
 *.log

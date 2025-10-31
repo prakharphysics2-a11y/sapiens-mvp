@@ -5,9 +5,6 @@ from PIL import Image
 import os
 import sys
 import json
-import time
-import requests
-from tqdm import tqdm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,69 +15,47 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-print("--- Loading Thermal PV Inference Module (v7 - PyTorch 2.6 Fix) ---")
+print("--- Loading Thermal PV Inference Module (Git LFS Version) ---")
 
 # --- Configuration ---
-MODEL_DIR = "model_cache" 
+# The model is now just a local file in our project
+MODEL_DIR = "model_weights" 
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
-MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1"
 
 img_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
-logger.info("✓ Transforms defined.")
 
-# --- Download Function (No Changes) ---
-def download_model_if_needed(url, dest_path):
-    dest_dir = os.path.dirname(dest_path)
-    os.makedirs(dest_dir, exist_ok=True) 
+# --- Global variables ---
+model = None
+class_names = None
+device = None
+model_info_dict = {"name": MODEL_FILENAME, "status": "Not Loaded"}
 
-    if not os.path.exists(dest_path):
-        logger.info(f"Model not found at {dest_path}. Downloading from URL...")
-        try:
-            response = requests.get(url, stream=True, timeout=600)
-            response.raise_for_status()
-            total_size = int(response.headers.get('content-length', 0))
-            with open(dest_path, 'wb') as f, tqdm(
-                desc=MODEL_FILENAME, total=total_size, unit='iB',
-                unit_scale=True, unit_divisor=1024,
-            ) as bar:
-                for data in response.iter_content(chunk_size=8192):
-                    size = f.write(data)
-                    bar.update(size)
-            logger.info(f"✓ Model downloaded successfully.")
-            return True
-        except Exception as e:
-            logger.error(f"❌ ERROR: Download failed: {e}", exc_info=True)
-            if os.path.exists(dest_path): os.remove(dest_path)
-            return False
-    else:
-        logger.info(f"✓ Model already exists at {dest_path}.")
-        return True
-
-# --- Load Model Function (One line changed) ---
+# --- Load Model Function ---
 def load_model():
-    global model, class_names, device
-    if not download_model_if_needed(MODEL_URL, MODEL_PATH):
-         logger.critical("❌ CRITICAL: Failed to obtain model file.")
-         return None, None
+    global model, class_names, device, model_info_dict
 
-    device = torch.device("cpu")
-    logger.info(f"--- Loading Model to {device} ---")
+    # No download needed! Just check if the file exists.
+    if not os.path.exists(MODEL_PATH):
+        logger.critical(f"❌ CRITICAL: Model file not found at {MODEL_PATH}. Was it pushed with Git LFS?")
+        model_info_dict['status'] = "Error - File Missing"
+        return None, None
+
+    device = torch.device("cpu") # Use CPU on Render free tier
+    logger.info(f"--- Loading Model from {MODEL_PATH} to {device} ---")
     try:
-        # --- THIS IS THE FIX ---
-        # Added 'weights_only=False' to load the pickled model file
+        # Load the model with weights_only=False (for the PyTorch 2.6 fix)
         checkpoint = torch.load(MODEL_PATH, map_location=device, weights_only=False)
-        # --- END OF FIX ---
-
         logger.info("✓ Checkpoint loaded.")
+
         model_instance = models.resnet50(weights=None)
         num_ftrs = model_instance.fc.in_features
         loaded_class_names = checkpoint.get('class_names')
-        if not loaded_class_names: raise ValueError("Class names not found!")
+        if not loaded_class_names: raise ValueError("Class names not found in checkpoint!")
 
         num_classes = len(loaded_class_names)
         model_instance.fc = nn.Sequential(
@@ -90,14 +65,20 @@ def load_model():
         model_instance.eval()
         model = model_instance.to(device)
         class_names = loaded_class_names
+
+        model_info_dict.update({
+            "status": "Loaded",
+            "device": str(device),
+            "num_classes": num_classes,
+            "classes": class_names,
+            "accuracy": f"{checkpoint.get('val_acc', 0) * 100:.2f}%"
+        })
         logger.info("✓ Model ready for evaluation.")
         return model, class_names
     except Exception as e:
         logger.error(f"❌ ERROR: Failed during model loading!", exc_info=True)
+        model_info_dict['status'] = f"Error - {e}"
         return None, None
-
-# --- Global variables ---
-model = None; class_names = None; device = None
 
 # --- Inference Function ---
 def predict_image(image_path):
@@ -113,3 +94,7 @@ def predict_image(image_path):
     except Exception as e:
         logger.error(f"❌ ERROR during inference: {e}", exc_info=True)
         return "Inference Error", None
+
+# --- Function for health check ---
+def get_model_info():
+    return model_info_dict

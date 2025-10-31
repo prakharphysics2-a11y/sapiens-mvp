@@ -1,1 +1,2 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
+model_weights/resnet50_81_percent_v1.pth filter=lfs diff=lfs merge=lfs -text
