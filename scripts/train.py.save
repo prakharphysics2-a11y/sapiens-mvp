@@ -1,0 +1,143 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from sklearn.metrics import accuracy_score
+from tensorboardX import SummaryWriter
+from torchvision import transforms
+import sys
+import os
+import time
+
+# This allows the script to find your model_setup.py file
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from scripts.model_setup import PVFaultDataset, get_custom_resnet, transform  # Import grayscale transform
+
+print("--- Starting Step 4: Model Training ---")
+
+# --- 1. Configuration ---
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+DATA_DIR_TRAIN = 'data/thermal_final/train'
+DATA_DIR_VAL = 'data/thermal_final/val'
+MODEL_SAVE_PATH = 'models/thermal_kaggle_trained.pth'
+NUM_EPOCHS = 15
+BATCH_SIZE = 32
+LEARNING_RATE = 1e-5  # Lowered for fine-tuning
+
+print(f"Using device: {device}")
+
+# --- 2. Data Preparation ---
+val_transform = transform  # Same for val
+
+train_dataset = PVFaultDataset(root_dir=DATA_DIR_TRAIN, transform=transform)
+val_dataset = PVFaultDataset(root_dir=DATA_DIR_VAL, transform=val_transform)
+
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
+
+num_classes = len(train_dataset.classes)
+print(f"Found {num_classes} classes: {train_dataset.classes}")
+
+# --- 3. Model, Loss, and Optimizer ---
+model = get_custom_resnet(num_classes=num_classes).to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+from torch.optim.lr_scheduler import CosineAnnealingLR
+scheduler = CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
+
+# --- 4. Training Loop ---
+writer = SummaryWriter('runs/phase2_training')
+best_val_acc = 0.0
+patience, trigger_times = 15, 0  # Disable early stopping (full run)
+
+print("\n\n--- Starting Training Loop ---")
+start_time = time.time()
+
+for epoch in range(NUM_EPOCHS):
+    model.train()
+    running_loss = 0.0
+    train_preds = []
+    train_labels = []
+
+    for inputs, labels in train_loader:
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item() * inputs.size(0)
+        _, preds = torch.max(outputs, 1)
+        train_preds.extend(preds.cpu().numpy())
+        train_labels.extend(labels.cpu().numpy())
+
+    epoch_loss = running_loss / len(train_dataset)
+    epoch_acc = accuracy_score(train_labels, train_preds)
+
+    model.eval()
+    val_preds = []
+    val_labels = []
+    val_running_loss = 0.0
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            val_running_loss += loss.item() * inputs.size(0)
+            _, preds = torch.max(outputs, 1)
+            val_preds.extend(preds.cpu().numpy())
+            val_labels.extend(labels.cpu().numpy())
+
+    val_loss = val_running_loss / len(val_dataset)
+    val_acc = accuracy_score(val_labels, val_preds)
+
+    print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
+    writer.add_scalar('Loss/train', epoch_loss, epoch)
+    writer.add_scalar('Accuracy/train', epoch_acc, epoch)
+    writer.add_scalar('Loss/val', val_loss, epoch)
+    writer.add_scalar('Accuracy/val', val_acc, epoch)
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        torch.save(model.state_dict(), MODEL_SAVE_PATH)
+        print(f"New best model saved to {MODEL_SAVE_PATH} with accuracy: {best_val_acc:.4f}")
+        trigger_times = 0
+    else:
+        trigger_times += 1
+        if trigger_times >= patience:
+            print(f"Early stopping at epoch {epoch+1}")
+            break
+
+    scheduler.step()
+
+writer.close()
+time_elapsed = time.time() - start_time
+print(f'\nTraining complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
+print(f"Best validation accuracy: {best_val_acc:.4f}")
+ val_labels = []
+    val_running_loss = 0.0
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            val_running_loss += loss.item() * inputs.size(0)
+            _, preds = torch.max(outputs, 1)
+            val_preds.extend(preds.cpu().numpy())
+            val_labels.extend(labels.cpu().numpy())
+
+    val_loss = val_running_loss / len(val_dataset)
+    val_acc = accuracy_score(val_labels, val_preds)
+
+    print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_l>
+
+    writer.add_scalar('Loss/train', epoch_loss, epoch)
+    writer.add_scalar('Accuracy/train', epoch_acc, epoch)
+    writer.add_scalar('Loss/val', val_loss, epoch)
+    writer.add_scalar('Accuracy/val', val_acc, epoch)
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        torch.save(model.state_dict(), MODEL_SAVE_PATH)

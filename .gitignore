@@ -34,3 +34,24 @@ models/
 
 # Logs
 *.log
+# Python
+phase2_env/
+__pycache__/
+*.pyc
+
+# Datasets
+master_dataset/
+new_dataset_sources/
+pvmd/
+solar_dataset/
+
+# Models
+model_backups/
+model_weights/
+*.pth
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
