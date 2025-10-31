@@ -18,15 +18,12 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-print("--- Loading Thermal PV Inference Module (v6 - Local Cache) ---")
+print("--- Loading Thermal PV Inference Module (v7 - PyTorch 2.6 Fix) ---")
 
 # --- Configuration ---
-# Use a local folder. Render will create this in its temporary filesystem.
 MODEL_DIR = "model_cache" 
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
-
-# Your Dropbox Download Link
 MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1"
 
 img_transforms = transforms.Compose([
@@ -36,10 +33,9 @@ img_transforms = transforms.Compose([
 ])
 logger.info("✓ Transforms defined.")
 
-# --- Download Function ---
+# --- Download Function (No Changes) ---
 def download_model_if_needed(url, dest_path):
     dest_dir = os.path.dirname(dest_path)
-    # Create the local directory if it doesn't exist
     os.makedirs(dest_dir, exist_ok=True) 
 
     if not os.path.exists(dest_path):
@@ -65,18 +61,21 @@ def download_model_if_needed(url, dest_path):
         logger.info(f"✓ Model already exists at {dest_path}.")
         return True
 
-# --- Load Model Function ---
+# --- Load Model Function (One line changed) ---
 def load_model():
     global model, class_names, device
     if not download_model_if_needed(MODEL_URL, MODEL_PATH):
          logger.critical("❌ CRITICAL: Failed to obtain model file.")
          return None, None
 
-    # Use CPU for loading on Render's free tier
     device = torch.device("cpu")
     logger.info(f"--- Loading Model to {device} ---")
     try:
-        checkpoint = torch.load(MODEL_PATH, map_location=device)
+        # --- THIS IS THE FIX ---
+        # Added 'weights_only=False' to load the pickled model file
+        checkpoint = torch.load(MODEL_PATH, map_location=device, weights_only=False)
+        # --- END OF FIX ---
+
         logger.info("✓ Checkpoint loaded.")
         model_instance = models.resnet50(weights=None)
         num_ftrs = model_instance.fc.in_features
