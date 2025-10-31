@@ -10,7 +10,7 @@ services:
       - key: PYTHONUNBUFFERED
         value: "true"
       - key: MODEL_DIR
-        value: "/var/data/pv_hawk_models"
+        value: "/mnt/pv_hawk_models"
     build:
       dir: .
     healthCheckPath: /health
@@ -18,5 +18,5 @@ services:
     
     disk:
       name: pv-hawk-model-storage
-      mountPath: /var/data
-      sizeGB: 250
+      mountPath: /mnt
+      sizeGB: 300

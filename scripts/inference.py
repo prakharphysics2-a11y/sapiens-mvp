@@ -22,7 +22,7 @@ if not logger.handlers:
 print("--- Loading Thermal PV Inference Module ---")
 
 # --- Configuration ---
-MODEL_DIR = os.environ.get("MODEL_DIR", "/var/data/model_weights") # For Render's persistent disk
+MODEL_DIR = os.environ.get("MODEL_DIR", "/mnt/model_weights") # For Render's persistent disk
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 # Your Dropbox direct download link
