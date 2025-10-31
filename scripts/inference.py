@@ -10,6 +10,7 @@ import requests
 from tqdm import tqdm
 import logging
 
+# Configure logger for this module
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -18,15 +19,12 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-print("--- Loading Thermal PV Inference Module (Correct Path v4) ---")
+print("--- Loading Thermal PV Inference Module (Syntax Fix v5) ---")
 
 # --- Configuration ---
-# THIS IS THE CORRECT PATH YOU SET UP IN RENDER
-MODEL_DIR = "/var/data/model_weights" 
+MODEL_DIR = os.environ.get("MODEL_DIR", "/var/data/model_weights")
 MODEL_FILENAME = "resnet50_81_percent_v1.pth"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
-
-# YOUR DROPBOX LINK
 MODEL_URL = "https://www.dropbox.com/scl/fi/pmvdmnu3jjq379hh9b8xj/resnet50_81_percent_v1.pth?rlkey=3x197yyzs8m6t4vs19125gu&dl=1"
 
 img_transforms = transforms.Compose([
@@ -42,7 +40,7 @@ def download_model_if_needed(url, dest_path):
 
     if not os.path.exists(dest_path):
         if not os.path.exists(dest_dir):
-             logger.error(f"❌ ERROR: Destination directory {dest_dir} does not exist. Check Render disk mount path.")
+             logger.error(f"❌ ERROR: Destination directory {dest_dir} does not exist.")
              return False
 
         logger.info(f"Model not found at {dest_path}. Downloading from URL...")
@@ -69,11 +67,23 @@ def download_model_if_needed(url, dest_path):
             return True
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ ERROR: Download failed. Check URL/network. Error: {e}")
-            if os.path.exists(dest_path): try: os.remove(dest_path); except OSError: pass
+            # --- SYNTAX FIX HERE ---
+            if os.path.exists(dest_path):
+                try:
+                    os.remove(dest_path)
+                except OSError:
+                    pass
+            # --- END OF FIX ---
             return False
         except Exception as e:
             logger.error(f"❌ ERROR: Unexpected error during download: {e}")
-            if os.path.exists(dest_path): try: os.remove(dest_path); except OSError: pass
+            # --- SYNTAX FIX HERE ---
+            if os.path.exists(dest_path):
+                try:
+                    os.remove(dest_path)
+                except OSError:
+                    pass
+            # --- END OF FIX ---
             return False
     else:
         logger.info(f"✓ Model already exists at {dest_path}.")
@@ -94,9 +104,7 @@ def load_model():
         model_instance = models.resnet50(weights=None)
         num_ftrs = model_instance.fc.in_features
         loaded_class_names = checkpoint.get('class_names')
-        if not loaded_class_names:
-            raise ValueError("Class names not found in checkpoint!")
-
+        if not loaded_class_names: raise ValueError("Class names not found in checkpoint!")
         num_classes = len(loaded_class_names)
         model_instance.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512), nn.ReLU(), nn.Dropout(0.5), nn.Linear(512, num_classes)
@@ -133,3 +141,8 @@ def predict_image(image_path):
     except Exception as e:
         logger.error(f"❌ ERROR during inference for {image_path}", exc_info=True)
         return "Inference Error", None
+
+# (Local testing code can remain the same)
+if __name__ == '__main__':
+    # Your local testing code here...
+    pass
